@@ -1,0 +1,9 @@
+node_modules
+.env
+fbi-bot
+fbi-bot.exe
+.git
+.gitignore
+.cursor
+.vscode
+*.md

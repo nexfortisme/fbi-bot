@@ -1,0 +1,10 @@
+services:
+  fbi-bot:
+    build: .
+    container_name: fbi-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Reach an LLM server running on the host (e.g. LM Studio on :1234).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
