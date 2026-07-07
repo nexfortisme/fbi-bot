@@ -1,11 +1,30 @@
 import { config } from "./config";
 
-export async function callLLM(userContent: string): Promise<string> {
+type UserContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+export async function callLLM(
+  userContent: string,
+  imageDataUrls: string[] = [],
+): Promise<string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
   if (config.llmApiKey) {
     headers.Authorization = `Bearer ${config.llmApiKey}`;
+  }
+
+  let userMessageContent: string | UserContentPart[] = userContent;
+  if (imageDataUrls.length > 0) {
+    const parts: UserContentPart[] = [];
+    if (userContent.trim().length > 0) {
+      parts.push({ type: "text", text: userContent });
+    }
+    for (const url of imageDataUrls) {
+      parts.push({ type: "image_url", image_url: { url } });
+    }
+    userMessageContent = parts;
   }
 
   const response = await fetch(`${config.llmBaseUrl}/chat/completions`, {
@@ -15,7 +34,7 @@ export async function callLLM(userContent: string): Promise<string> {
       model: config.llmModel,
       messages: [
         { role: "system", content: config.fbiSystemPrompt },
-        { role: "user", content: userContent },
+        { role: "user", content: userMessageContent },
       ],
     }),
   });
