@@ -19,7 +19,8 @@ export const config = {
 
   voiceJoinMinMinutes: Number(process.env.VOICE_JOIN_MIN_MINUTES ?? 30),
   voiceJoinMaxMinutes: Number(process.env.VOICE_JOIN_MAX_MINUTES ?? 120),
-  voiceSitSeconds: Number(process.env.VOICE_SIT_SECONDS ?? 45),
+  voicePauseMinSeconds: Number(process.env.VOICE_PAUSE_MIN_SECONDS ?? 3),
+  voicePauseMaxSeconds: Number(process.env.VOICE_PAUSE_MAX_SECONDS ?? 10),
   voiceJoinRetryCount: Number(process.env.VOICE_JOIN_RETRY_COUNT ?? 3),
 
   fbiSystemPrompt: process.env.FBI_SYSTEM_PROMPT ?? DEFAULT_FBI_SYSTEM_PROMPT,

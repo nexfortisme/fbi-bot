@@ -1,20 +1,80 @@
-import { ChannelType, type Client, type Guild } from "discord.js";
+import { existsSync, readdirSync } from "node:fs";
+import { basename, join } from "node:path";
+import { ChannelType, type Client, type Guild, type VoiceBasedChannel } from "discord.js";
 import {
+  AudioPlayerStatus,
+  createAudioPlayer,
+  createAudioResource,
   entersState,
   joinVoiceChannel,
+  type VoiceConnection,
   VoiceConnectionStatus,
 } from "@discordjs/voice";
 import { config } from "../config";
 
+const CLIP_EXTENSIONS = new Set([".mp3", ".ogg", ".webm", ".wav"]);
+
+function randomBetween(min: number, max: number): number {
+  return min + Math.random() * (max - min);
+}
+
 function randomMs(minMinutes: number, maxMinutes: number): number {
-  const minMs = minMinutes * 60_000;
-  const maxMs = maxMinutes * 60_000;
-  return minMs + Math.random() * (maxMs - minMs);
+  return randomBetween(minMinutes * 60_000, maxMinutes * 60_000);
 }
 
 function takeRandom<T>(items: T[]): T {
   const index = Math.floor(Math.random() * items.length);
   return items.splice(index, 1)[0]!;
+}
+
+function resolveAssetsDir(): string {
+  const candidates = [
+    join(import.meta.dir, "../../assets"),
+    join(process.cwd(), "assets"),
+  ];
+  for (const dir of candidates) {
+    if (existsSync(dir)) return dir;
+  }
+  return candidates[0]!;
+}
+
+function listAudioClips(): string[] {
+  const assetsDir = resolveAssetsDir();
+  if (!existsSync(assetsDir)) return [];
+
+  return readdirSync(assetsDir)
+    .filter((name) => CLIP_EXTENSIONS.has(name.slice(name.lastIndexOf(".")).toLowerCase()))
+    .map((name) => join(assetsDir, name));
+}
+
+function channelHasPeople(channel: VoiceBasedChannel): boolean {
+  return channel.members.some((member) => !member.user.bot);
+}
+
+async function playRandomClip(connection: VoiceConnection): Promise<void> {
+  const clips = listAudioClips();
+  if (clips.length === 0) {
+    console.warn("[voiceJoin] No audio clips found in assets/, skipping playback.");
+    return;
+  }
+
+  const clipPath = clips[Math.floor(Math.random() * clips.length)]!;
+  const player = createAudioPlayer();
+  const subscription = connection.subscribe(player);
+  const resource = createAudioResource(clipPath);
+
+  player.play(resource);
+  console.log(`[voiceJoin] Playing "${basename(clipPath)}".`);
+
+  try {
+    await entersState(player, AudioPlayerStatus.Playing, 5_000);
+    await entersState(player, AudioPlayerStatus.Idle, 30_000);
+  } catch (error) {
+    console.error(`[voiceJoin] Failed to play "${basename(clipPath)}":`, error);
+    player.stop(true);
+  } finally {
+    subscription?.unsubscribe();
+  }
 }
 
 async function attemptDropIn(guild: Guild): Promise<void> {
@@ -39,7 +99,18 @@ async function attemptDropIn(guild: Guild): Promise<void> {
       await entersState(connection, VoiceConnectionStatus.Ready, 10_000);
       console.log(`[voiceJoin] Joined "${channel.name}" in "${guild.name}".`);
 
-      await new Promise((resolve) => setTimeout(resolve, config.voiceSitSeconds * 1_000));
+      const pauseMs = randomBetween(
+        config.voicePauseMinSeconds * 1_000,
+        config.voicePauseMaxSeconds * 1_000,
+      );
+      console.log(`[voiceJoin] Waiting ${(pauseMs / 1_000).toFixed(1)}s before acting.`);
+      await new Promise((resolve) => setTimeout(resolve, pauseMs));
+
+      if (channelHasPeople(channel)) {
+        await playRandomClip(connection);
+      } else {
+        console.log(`[voiceJoin] "${channel.name}" is empty, leaving silently.`);
+      }
 
       connection.destroy();
       console.log(`[voiceJoin] Left "${channel.name}" in "${guild.name}".`);
