@@ -13,6 +13,7 @@ import {
 import { config } from "../config";
 
 const CLIP_EXTENSIONS = new Set([".mp3", ".ogg", ".webm", ".wav"]);
+const EMPTY_CHANNEL_STAY_MS = 45_000;
 
 function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -109,7 +110,10 @@ async function attemptDropIn(guild: Guild): Promise<void> {
       if (channelHasPeople(channel)) {
         await playRandomClip(connection);
       } else {
-        console.log(`[voiceJoin] "${channel.name}" is empty, leaving silently.`);
+        console.log(
+          `[voiceJoin] "${channel.name}" is empty, staying ${(EMPTY_CHANNEL_STAY_MS / 1_000).toFixed(0)}s before leaving.`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, EMPTY_CHANNEL_STAY_MS));
       }
 
       connection.destroy();
